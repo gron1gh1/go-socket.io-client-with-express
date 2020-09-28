@@ -1,31 +1,38 @@
 package main
 
 import (
-       "github.com/graarh/golang-socketio"
-       "github.com/graarh/golang-socketio/transport"
-       "log"
+	"log"
+	"time"
+
+	gosocketio "github.com/graarh/golang-socketio"
+	"github.com/graarh/golang-socketio/transport"
 )
 
 type MyEventData struct {
-	Data string
+	Data int
 }
-	
+
 func main() {
-       transport := transport.GetDefaultWebsocketTransport()
-       ws_url := "ws://localhost/socket.io/?EIO=3&transport=websocket"
-       client, err := gosocketio.Dial(ws_url, transport)
-       if err != nil {
-           log.Fatal(err)
-       }
-       client.On(gosocketio.OnConnection, func(c *gosocketio.Channel, args interface{}) {
-		   log.Println("Connected!")
-		   client.Emit("msg", MyEventData{"Hello"})
-       })
+	transport := transport.GetDefaultWebsocketTransport()
+	ws_url := "ws://localhost/socket.io/?EIO=3&transport=websocket"
+	client, err := gosocketio.Dial(ws_url, transport)
+	defer client.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+	client.On(gosocketio.OnConnection, func(c *gosocketio.Channel, args interface{}) {
+		log.Println("Connected!")
 
-	   // Block to give client time to connect 
-	   select
-		{
-
+	})
+	go func() {
+		i := 0
+		for {
+			i++
+			client.Emit("data", MyEventData{i})
+			time.Sleep(time.Second * 1)
+			log.Println(i)
 		}
-       client.Close()
+	}()
+	// Block to give client time to connect
+	select {}
 }

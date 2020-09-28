@@ -15,11 +15,13 @@ server.listen(80,()=>console.log('server on 80!'));
 
 io.on('connection',(socket) =>{
   //  console.log(socket);
-    socket.on('msg',(data) =>{
+    socket.on('data',(data) =>{
         console.log('data',data);
+        io.emit('data',data);
     })
+
 });
 
-app.get('/',(req,res)=>{
+app.get('/',(req,res)=> {
     res.sendFile(__dirname+'/index.html');
 });
