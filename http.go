@@ -1,85 +1,39 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
-
-	socketio "github.com/googollee/go-socket.io"
-	"github.com/rs/cors"
-	"github.com/googollee/go-engine.io/transport/polling"
-	"github.com/googollee/go-engine.io/transport/websocket"
-	"github.com/googollee/go-engine.io"
-	"github.com/googollee/go-engine.io/transport"
+	gosocketio "github.com/graarh/golang-socketio"
+	"github.com/graarh/golang-socketio/transport"
 )
 
 func main() {
+	server := gosocketio.NewServer(transport.GetDefaultWebsocketTransport())
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("{\"hello\": \"world\"}"))
+	//handle connected
+	server.On(gosocketio.OnConnection, func(c *gosocketio.Channel) {
+		log.Println("New client connected")
+		//join them to room
+		c.Join("chat")
 	})
 
-	pt := polling.Default
-
-	wt := websocket.Default
-	wt.CheckOrigin = func(req *http.Request) bool {
-		return true
+	type Message struct {
+		Name string `json:"name"`
+		Message string `json:"message"`
 	}
 
-	server, err := socketio.NewServer(&engineio.Options{
-		Transports: []transport.Transport{
-			pt,
-			wt,
-		},
+	//handle custom event
+	server.On("msg", func(c *gosocketio.Channel, msg Message) string {
+		//send event to all in room
+		log.Println(msg)
+		return "OK"
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	
-	server.OnConnect("/", func(s socketio.Conn) error {
-		s.SetContext("")
-		fmt.Println("connected:", s.ID())
-		return nil
-	})
+	channel, _ := server.GetChannel("msg")
 
-	server.OnEvent("/", "notice", func(s socketio.Conn, msg string) {
-		fmt.Println("notice:", msg)
-		s.Emit("reply", "have "+msg)
-	})
-	server.OnEvent("/chat", "msg", func(s socketio.Conn, msg string) string {
-		s.SetContext(msg)
-		return "recv " + msg
-	})
-	server.OnEvent("/", "bye", func(s socketio.Conn) string {
-		last := s.Context().(string)
-		s.Emit("bye", last)
-		s.Close()
-		return last
-	})
-	server.OnError("/", func(e error) {
-		fmt.Println("meet error:", e)
-	})
-	server.OnDisconnect("/", func(s socketio.Conn, msg string) {
-		fmt.Println("closed", msg)
-	})
-
-	go server.Serve()
-	defer server.Close()
-
-	mux.Handle("/socket.io/", server)
-	//http.Handle("/", http.FileServer(http.Dir("./asset")))
-
-	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://localhost"},
-		AllowedMethods:  []string{"GET", "PUT", "OPTIONS", "POST", "DELETE"},
-		AllowCredentials: true,
-	})
-
-	// decorate existing handler with cors functionality set in c
-	handler := c.Handler(mux)
-
-	log.Println("Serving at localhost:8000...")
-	log.Fatal(http.ListenAndServe(":8000", handler))
+	channel.Emit("msg","my data")
+	//setup http server
+	serveMux := http.NewServeMux()
+	serveMux.Handle("/socket.io/", server)
+	serveMux.Handle("/", http.FileServer(http.Dir("./asset")))
+	log.Panic(http.ListenAndServe(":80", serveMux))
 }
