@@ -29,7 +29,8 @@ func main() {
 		for {
 			i++
 			client.Emit("data", MyEventData{i})
-			time.Sleep(time.Second * 1)
+			time.Sleep(time.Millisecond * 500)
+
 			log.Println(i)
 		}
 	}()
